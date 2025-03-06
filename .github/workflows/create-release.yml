@@ -172,10 +172,14 @@ jobs:
 
           current_platforms="$(cat "$default_stack_dir/stack.toml" | ./yj -tj | jq -c '[.platforms[] | { name: sub("linux/"; "") , is_new: true }]')"
 
-          # get previous platforms
-          git show $(git describe --tags --abbrev=0):"$default_stack_dir/stack.toml" > ./previous_stack.toml
+          if [ "$(git tag | wc -l)" -eq 0 ]; then
+            previous_platforms="[]"
+          else
+            # get previous platforms
+            git show $(git describe --tags --abbrev=0):"$default_stack_dir/stack.toml" >./previous_stack.toml
 
-          previous_platforms="$(cat ./previous_stack.toml | ./yj -tj | jq -c '[.platforms[] | { name: sub("linux/"; "") , is_new: false }]')"
+            previous_platforms="$(cat ./previous_stack.toml | ./yj -tj | jq -c '[.platforms[] | { name: sub("linux/"; "") , is_new: false }]')"
+          fi
 
           platforms=$(echo "$current_platforms" | jq -c --argjson prev "$previous_platforms" '
               map(
