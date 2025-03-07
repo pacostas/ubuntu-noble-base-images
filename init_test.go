@@ -15,12 +15,27 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var stack struct {
+var tinyStack struct {
 	BuildArchive string
 	RunArchive   string
 	BuildImageID string
 	RunImageID   string
 }
+
+var baseStack struct {
+	BuildArchive string
+	RunArchive   string
+	BuildImageID string
+	RunImageID   string
+}
+
+var fullStack struct {
+	BuildArchive string
+	RunArchive   string
+	BuildImageID string
+	RunImageID   string
+}
+
 var localRegistryPort int
 
 func by(_ string, f func()) { f() }
@@ -45,15 +60,27 @@ func TestAcceptance(t *testing.T) {
 	localRegistryPort, err = getFreePort()
 	Expect(err).ToNot(HaveOccurred())
 
-	stack.BuildArchive = filepath.Join(root, "build", "build.oci")
-	stack.BuildImageID = fmt.Sprintf("localhost:%d/stack-build-%s", localRegistryPort, uuid.NewString())
+	tinyStack.BuildArchive = filepath.Join(root, "builds", "noble-tiny-stack", "build.oci")
+	tinyStack.BuildImageID = fmt.Sprintf("localhost:%d/tiny-stack-build-%s", localRegistryPort, uuid.NewString())
 
-	stack.RunArchive = filepath.Join(root, "build", "run.oci")
-	stack.RunImageID = fmt.Sprintf("localhost:%d/stack-run-%s", localRegistryPort, uuid.NewString())
+	tinyStack.RunArchive = filepath.Join(root, "builds", "noble-tiny-stack", "run.oci")
+	tinyStack.RunImageID = fmt.Sprintf("localhost:%d/-tiny-stack-run-%s", localRegistryPort, uuid.NewString())
+
+	baseStack.BuildArchive = filepath.Join(root, "builds", "noble-base-stack", "build.oci")
+	baseStack.BuildImageID = fmt.Sprintf("localhost:%d/base-stack-build-%s", localRegistryPort, uuid.NewString())
+
+	baseStack.RunArchive = filepath.Join(root, "builds", "noble-base-stack", "run.oci")
+	baseStack.RunImageID = fmt.Sprintf("localhost:%d/-base-stack-run-%s", localRegistryPort, uuid.NewString())
+
+	fullStack.BuildArchive = filepath.Join(root, "builds", "noble-full-stack", "build.oci")
+	fullStack.BuildImageID = fmt.Sprintf("localhost:%d/full-stack-build-%s", localRegistryPort, uuid.NewString())
+
+	fullStack.RunArchive = filepath.Join(root, "builds", "noble-full-stack", "run.oci")
+	fullStack.RunImageID = fmt.Sprintf("localhost:%d/-full-stack-run-%s", localRegistryPort, uuid.NewString())
 
 	suite := spec.New("Acceptance", spec.Report(report.Terminal{}), spec.Parallel())
-	suite("Metadata", testMetadata)
-	suite("BuildpackIntegration", testBuildpackIntegration)
-
+	suite("Tiny Stack Metadata", testMetadataTinyStack)
+	suite("Base Stack Metadata", testMetadataBaseStack)
+	suite("Full Stack Metadata", testMetadataFullStack)
 	suite.Run(t)
 }
