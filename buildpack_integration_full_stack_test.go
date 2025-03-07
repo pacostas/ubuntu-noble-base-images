@@ -7,16 +7,16 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/google/uuid"
-	"github.com/sclevine/spec"
-
-	. "github.com/onsi/gomega"
+	"time"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/layout"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/google/uuid"
+	"github.com/sclevine/spec"
+
+	. "github.com/onsi/gomega"
 
 	"github.com/paketo-buildpacks/occam"
 	. "github.com/paketo-buildpacks/occam/matchers"
@@ -24,17 +24,13 @@ import (
 	"github.com/paketo-buildpacks/packit/v2/vacation"
 )
 
-const RegistryName = "registry:2"
-
-func testBuildpackIntegration(t *testing.T, context spec.G, it spec.S) {
+func testBuildpackIntegrationFullStack(t *testing.T, context spec.G, it spec.S) {
 	var (
 		Expect     = NewWithT(t).Expect
 		Eventually = NewWithT(t).Eventually
 
-		mavenBuildpack         string
-		jvmBuildpack           string
-		syftBuildpack          string
-		executableJarBuildpack string
+		buildPlanBuildpack string
+		goDistBuildpack    string
 
 		builderConfigFilepath string
 
@@ -45,7 +41,6 @@ func testBuildpackIntegration(t *testing.T, context spec.G, it spec.S) {
 		builder string
 
 		image     occam.Image
-		registry  occam.Container
 		container occam.Container
 	)
 
@@ -55,18 +50,11 @@ func testBuildpackIntegration(t *testing.T, context spec.G, it spec.S) {
 
 		var err error
 
-		registry, err = docker.Container.Run.
-			WithPublish(fmt.Sprintf("%d:5000", localRegistryPort)).
-			Execute(RegistryName)
-		Expect(err).NotTo(HaveOccurred())
-
 		name, err = occam.RandomName()
 		Expect(err).NotTo(HaveOccurred())
 
-		mavenBuildpack = "gcr.io/paketo-buildpacks/maven"
-		jvmBuildpack = "gcr.io/paketo-buildpacks/sap-machine"
-		syftBuildpack = "gcr.io/paketo-buildpacks/syft"
-		executableJarBuildpack = "gcr.io/paketo-buildpacks/executable-jar"
+		buildPlanBuildpack = "index.docker.io/paketocommunity/build-plan"
+		goDistBuildpack = "gcr.io/paketo-buildpacks/go-dist"
 
 		source, err = occam.Source(filepath.Join("integration", "testdata", "simple_app"))
 		Expect(err).NotTo(HaveOccurred())
@@ -81,13 +69,13 @@ func testBuildpackIntegration(t *testing.T, context spec.G, it spec.S) {
   id = "io.buildpacks.stacks.noble"
   run-image = "%s:latest"
 `,
-			stack.BuildImageID,
-			stack.RunImageID,
+			fullStack.BuildImageID,
+			fullStack.RunImageID,
 		)
 		Expect(err).NotTo(HaveOccurred())
 
-		Expect(archiveToDaemon(stack.BuildArchive, stack.BuildImageID)).To(Succeed())
-		Expect(archiveToDaemon(stack.RunArchive, stack.RunImageID)).To(Succeed())
+		Expect(archiveToDaemon(fullStack.BuildArchive, fullStack.BuildImageID)).To(Succeed())
+		Expect(archiveToDaemon(fullStack.RunArchive, fullStack.RunImageID)).To(Succeed())
 
 		builder = fmt.Sprintf("builder-%s", uuid.NewString())
 		logs, err := createBuilder(builderConfigFilepath, builder)
@@ -95,7 +83,6 @@ func testBuildpackIntegration(t *testing.T, context spec.G, it spec.S) {
 	})
 
 	it.After(func() {
-		Expect(docker.Container.Remove.Execute(registry.ID)).To(Succeed())
 		Expect(docker.Container.Remove.Execute(container.ID)).To(Succeed())
 		Expect(docker.Image.Remove.Execute(image.ID)).To(Succeed())
 		Expect(docker.Volume.Remove.Execute(occam.CacheVolumeNames(name))).To(Succeed())
@@ -106,9 +93,8 @@ func testBuildpackIntegration(t *testing.T, context spec.G, it spec.S) {
 		Expect(docker.Image.Remove.Execute(builder)).To(Succeed())
 		Expect(os.RemoveAll(builderConfigFilepath)).To(Succeed())
 
-		Expect(docker.Image.Remove.Execute(stack.BuildImageID)).To(Succeed())
-		Expect(docker.Image.Remove.Execute(stack.RunImageID)).To(Succeed())
-		Expect(docker.Image.Remove.Execute(RegistryName)).To(Succeed())
+		Expect(docker.Image.Remove.Execute(fullStack.BuildImageID)).To(Succeed())
+		Expect(docker.Image.Remove.Execute(fullStack.RunImageID)).To(Succeed())
 
 		Expect(docker.Image.Remove.Execute(fmt.Sprintf("buildpacksio/lifecycle:%s", lifecycleVersion))).To(Succeed())
 
@@ -118,14 +104,10 @@ func testBuildpackIntegration(t *testing.T, context spec.G, it spec.S) {
 	it("builds an app with a buildpack", func() {
 		var err error
 		var logs fmt.Stringer
-
 		image, logs, err = pack.WithNoColor().Build.
-			WithPullPolicy("if-not-present").
 			WithBuildpacks(
-				jvmBuildpack,
-				syftBuildpack,
-				mavenBuildpack,
-				executableJarBuildpack,
+				goDistBuildpack,
+				buildPlanBuildpack,
 			).
 			WithEnv(map[string]string{
 				"BP_LOG_LEVEL": "DEBUG",
@@ -135,14 +117,17 @@ func testBuildpackIntegration(t *testing.T, context spec.G, it spec.S) {
 		Expect(err).ToNot(HaveOccurred(), logs.String)
 
 		container, err = docker.Container.Run.
+			WithDirect().
+			WithCommand("go").
+			WithCommandArgs([]string{"run", "main.go"}).
 			WithEnv(map[string]string{"PORT": "8080"}).
 			WithPublish("8080").
 			WithPublishAll().
 			Execute(image.ID)
 		Expect(err).NotTo(HaveOccurred())
 
-		Eventually(container).Should(BeAvailable())
-		Eventually(container).Should(Serve(ContainSubstring("Hello World! Java version")).OnPort(8080))
+		Eventually(container).WithTimeout(20 * time.Second).Should(BeAvailable())
+		Eventually(container).Should(Serve(MatchRegexp(`go1.*`)).OnPort(8080))
 	})
 }
 
