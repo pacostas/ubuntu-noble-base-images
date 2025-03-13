@@ -14,7 +14,7 @@
       "create_build_image": true
     },
     {
-      "name": "default",
+      "name": "noble-base",
       "config_dir": "stacks/noble-base-stack",
       "output_dir": "builds/noble-base-stack",
       "build_image": "build-noble-base",

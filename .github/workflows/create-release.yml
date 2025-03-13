@@ -167,7 +167,7 @@ jobs:
           curl -L $(curl -sL https://api.github.com/repos/sclevine/yj/releases/latest |  jq -r '.assets[] | select(.name=="yj-linux-amd64").browser_download_url') -o yj
           chmod +x yj
 
-          default_stack_dir=$(echo '${{ steps.get-stacks.outputs.stacks }}' | jq -r '.[] | select(.name=="default") | .config_dir')
+          default_stack_dir=$(echo '${{ steps.get-stacks.outputs.stacks }}' | jq -r '.[0] | .config_dir')
           echo "default_stack_dir=${default_stack_dir}" >> "$GITHUB_OUTPUT"
 
           current_platforms="$(cat "$default_stack_dir/stack.toml" | ./yj -tj | jq -c '[.platforms[] | { name: sub("linux/"; "") , is_new: true }]')"
@@ -1213,10 +1213,6 @@ jobs:
         if [ "${{ needs.preparation.outputs.polling_type }}" = "usn" ]; then
           for stack in $stacks; do
             stack_name=$(echo "$stack" | jq -r '.name')
-            stack_name_prefix="${stack}"
-            if [[ $stack_name == "default" ]]; then
-              stack_name_prefix=""
-            fi
 
             for arch in $archs; do
               arch_name=$(echo "$arch" | jq -r '.name')
@@ -1227,9 +1223,8 @@ jobs:
 
               usn_asset_name=$(
                 echo '[
-                  "${{ needs.preparation.outputs.github_repo_name }}",
+                  "'"$stack_name"'",
                   "${{ steps.tag.outputs.tag }}",
-                  "'"$stack_name_prefix"'",
                   "'"$arch_prefix"'",
                   "${{ env.PATCHED_USNS_FILENAME }}"
                 ]' | jq -r 'map(select(length > 0)) | join("-")'
