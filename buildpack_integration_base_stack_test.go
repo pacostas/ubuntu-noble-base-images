@@ -51,7 +51,7 @@ func testBuildpackIntegrationBaseStack(t *testing.T, context spec.G, it spec.S) 
 		syftBuildpack = "gcr.io/paketo-buildpacks/syft"
 		executableJarBuildpack = "gcr.io/paketo-buildpacks/executable-jar"
 
-		source, err = occam.Source(filepath.Join("integration", "testdata", "simple_app"))
+		source, err = occam.Source(filepath.Join("integration", "testdata", "java_simple_app"))
 		Expect(err).NotTo(HaveOccurred())
 
 		builderConfigFile, err := os.CreateTemp("", "builder.toml")
@@ -82,7 +82,7 @@ func testBuildpackIntegrationBaseStack(t *testing.T, context spec.G, it spec.S) 
 		Expect(docker.Image.Remove.Execute(image.ID)).To(Succeed())
 		Expect(docker.Volume.Remove.Execute(occam.CacheVolumeNames(name))).To(Succeed())
 
-		lifecycleVersion, err := getLifecycleVersion(builder)
+		_, err := getLifecycleVersion(builder)
 		Expect(err).NotTo(HaveOccurred())
 
 		Expect(docker.Image.Remove.Execute(builder)).To(Succeed())
@@ -90,8 +90,6 @@ func testBuildpackIntegrationBaseStack(t *testing.T, context spec.G, it spec.S) 
 
 		Expect(docker.Image.Remove.Execute(baseStack.BuildImageID)).To(Succeed())
 		Expect(docker.Image.Remove.Execute(baseStack.RunImageID)).To(Succeed())
-
-		Expect(docker.Image.Remove.Execute(fmt.Sprintf("buildpacksio/lifecycle:%s", lifecycleVersion))).To(Succeed())
 
 		Expect(os.RemoveAll(source)).To(Succeed())
 	})
