@@ -873,24 +873,6 @@ jobs:
       with:
        name: diff-${{ matrix.arch.name }}-${{ matrix.stacks.name }}
 
-    - name: Set env diff variables
-      run: |
-
-        if [ "${{ matrix.stacks.create_build_image }}" == "true" ]; then
-          BUILD_ADDED=$(cat ./build_added)
-          BUILD_MODIFIED=$(cat ./build_modified)
-          echo "BUILD_ADDED=$BUILD_ADDED" >> $GITHUB_ENV
-          echo "BUILD_MODIFIED=$BUILD_MODIFIED" >> $GITHUB_ENV
-        else
-          echo "BUILD_ADDED=$BUILD_ADDED" >> $GITHUB_ENV
-          echo "BUILD_MODIFIED=$BUILD_MODIFIED" >> $GITHUB_ENV
-        fi
-
-        RUN_ADDED=$(cat ./run_added)
-        RUN_MODIFIED=$(cat ./run_modified)
-        echo "RUN_ADDED=$RUN_ADDED" >> $GITHUB_ENV
-        echo "RUN_MODIFIED=$RUN_MODIFIED" >> $GITHUB_ENV
-
     - name: Compare With Previous Release
       id: compare
       run: |
@@ -906,11 +888,11 @@ jobs:
         fi
 
         # shellcheck disable=SC2153
-        run_added=$(jq '. | length' <<< "${RUN_ADDED}")
+        run_added=$(cat ./run_added | jq 'length')
         echo "Run packages added: ${run_added}"
 
         # shellcheck disable=SC2153
-        run_modified=$(jq '. | length' <<< "${RUN_MODIFIED}")
+        run_modified=$(cat ./run_modified | jq 'length')
         echo "Run packages modified: ${run_modified}"
 
         if [ "${build_added:-0}" -eq 0 ] && [ "${build_modified:-0}" -eq 0 ] && [ "${run_added}" -eq 0 ] && [ "${run_modified}" -eq 0 ]; then
