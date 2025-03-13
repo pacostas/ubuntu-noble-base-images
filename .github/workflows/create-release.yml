@@ -537,11 +537,25 @@ jobs:
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v3
 
+    # TODO uncoment below code
+    # - name: Create stack ${{ matrix.stacks.name }}
+    #   id: create-stack
+    #   run: |
+    #     scripts/create.sh --stack-dir ${{ matrix.stacks.config_dir }} \
+    #                       --build-dir ${{ matrix.stacks.output_dir }}
+    # repo=$(echo "${full}" | sed 's/^.*\///')
+
+    ## TODO remove debug code
     - name: Create stack ${{ matrix.stacks.name }}
       id: create-stack
       run: |
-        scripts/create.sh --stack-dir ${{ matrix.stacks.config_dir }} \
-                          --build-dir ${{ matrix.stacks.output_dir }}
+        mkdir builds
+        stack_name=$(echo "${{ matrix.stacks.config_dir }}" | sed 's/^.*\///')
+        output_dir="${{ matrix.stacks.output_dir }}"
+        curl -LO "https://github.com/pacostas/tmp/releases/download/tmp2/${stack_name}.zip"
+        unzip "${stack_name}.zip"
+        mv  "${stack_name}" "./builds/"
+        tree .
 
     - name: Generate Package Receipts
       id: receipts
