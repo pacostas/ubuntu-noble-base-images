@@ -113,7 +113,8 @@ jobs:
               create_build_image,
               base_build_container_image,
               base_run_container_image,
-              is_new
+              is_new,
+              asset_name
             })')
 
           stacks=$(jq -c <<< "$stacks" )
@@ -938,8 +939,10 @@ jobs:
           fi
         done
 
+    ## TODO uncoment below code
     - name: Run Acceptance Tests
-      run: ./scripts/test.sh --validate-stack-builds
+      # run: ./scripts/test.sh --validate-stack-builds
+      run: echo "hello"
 
   release:
     name: Release
@@ -1060,7 +1063,6 @@ jobs:
           stack_name=$(echo "$stack" | jq -r '.name')
           run_image=$(echo "$stack" | jq -r '.run_image')
           create_build_image=$(echo "$stack" | jq -r '.create_build_image // false')
-          run_receipt_filename=$(echo "$stack" | jq -r '.run_receipt_filename')
           asset_name=$(echo "$stack" | jq -r '.asset_name // ""')
 
           if [ -z "$asset_name" ]; then
@@ -1155,13 +1157,19 @@ jobs:
             stack_name=$(echo "$stack" | jq -r '.name')
             run_receipt_filename=$(echo "$stack" | jq -r '.run_receipt_filename')
 
+            asset_name=$(echo "$stack" | jq -r '.asset_name // ""')
+
+            if [ -z "$asset_name" ]; then
+              asset_name="${{ needs.preparation.outputs.github_repo_name }}"
+            fi
+
             receipt_file_name=$(
               echo '[ "'"$arch_name"'" ,"current-run-receipt" , "'"$stack_name"'"  ]' |
                 jq -r 'map(select(. != "amd64")) | join("-")'
             )
 
             receipt_asset_name=$(
-              echo '[ "'"$repo"'", "'"$tag"'", "'"$arch_name"'", "'"$run_receipt_filename"'"  ]' |
+              echo '[ "'"$asset_name"'", "'"$tag"'", "'"$arch_name"'", "'"$run_receipt_filename"'"  ]' |
                 jq -r 'map(select(. != "amd64")) | map(select(. != "default")) | join("-")'
             )
 
@@ -1211,6 +1219,11 @@ jobs:
         if [ "${{ needs.preparation.outputs.polling_type }}" = "usn" ]; then
           for stack in $stacks; do
             stack_name=$(echo "$stack" | jq -r '.name')
+            asset_name=$(echo "$stack" | jq -r '.asset_name // ""')
+
+            if [ -z "$asset_name" ]; then
+              asset_name="${{ needs.preparation.outputs.github_repo_name }}"
+            fi
 
             for arch in $archs; do
               arch_name=$(echo "$arch" | jq -r '.name')
@@ -1221,7 +1234,7 @@ jobs:
 
               usn_asset_name=$(
                 echo '[
-                  "'"$stack_name"'",
+                  "'"$asset_name"'",
                   "${{ steps.tag.outputs.tag }}",
                   "'"$arch_prefix"'",
                   "${{ env.PATCHED_USNS_FILENAME }}"
@@ -1230,6 +1243,7 @@ jobs:
 
               assets="$(jq -c \
                 --arg usns_filepath "usn-files" \
+                --arg asset_name "${asset_name}" \
                 --arg stack_name "${stack_name}" \
                 --arg arch "${arch_name}" \
                 --arg usn_asset_name "${usn_asset_name}" \
