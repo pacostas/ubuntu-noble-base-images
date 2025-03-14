@@ -38,7 +38,6 @@ jobs:
       github_repo_name: ${{ steps.repo.outputs.github_repo_name }}
       registry_repo_name: ${{ steps.repo.outputs.registry_repo_name }}
       repo_owner: ${{ steps.repo.outputs.repo_owner }}
-      default_stack_dir: ${{ steps.lookup.outputs.default_stack_dir }}
       stack_files_dir: ${{ steps.get-stacks.outputs.stack_files_dir }}
     steps:
       - name: Checkout repo
@@ -163,22 +162,20 @@ jobs:
           set -euo pipefail
           shopt -s inherit_errexit
 
-          # install yj to parse TOML
-          curl -L $(curl -sL https://api.github.com/repos/sclevine/yj/releases/latest |  jq -r '.assets[] | select(.name=="yj-linux-amd64").browser_download_url') -o yj
-          chmod +x yj
+          if [[ -f ${{ env.STACKS_FILEPATH }} ]]; then
+            current_platforms="$(cat ${{ env.STACKS_FILEPATH }} | jq -c '[.platforms[] | { name: sub("linux/"; "") , is_new: true }]')"
 
-          default_stack_dir=$(echo '${{ steps.get-stacks.outputs.stacks }}' | jq -r '.[0] | .config_dir')
-          echo "default_stack_dir=${default_stack_dir}" >> "$GITHUB_OUTPUT"
+            git show $(git describe --tags --abbrev=0):"${{ env.STACKS_FILEPATH }}" > ./previous_images.json
 
-          current_platforms="$(cat "$default_stack_dir/stack.toml" | ./yj -tj | jq -c '[.platforms[] | { name: sub("linux/"; "") , is_new: true }]')"
-
-          if [ "$(git tag | wc -l)" -eq 0 ]; then
-            previous_platforms="[]"
+            if [[ -f "./previous_images.json" && "$(git tag | wc -l)" -ne 0 ]]; then
+              # get previous platforms
+              previous_platforms="$(cat ${{ env.STACKS_FILEPATH }} | jq -c '[.platforms[] | { name: sub("linux/"; "") , is_new: false }]')"
+            else
+              previous_platforms="[]"
+            fi
           else
-            # get previous platforms
-            git show "$(git describe --tags --abbrev=0):$default_stack_dir/stack.toml" > ./previous_stack.toml
-
-            previous_platforms="$(cat ./previous_stack.toml | ./yj -tj | jq -c '[.platforms[] | { name: sub("linux/"; "") , is_new: false }]')"
+            current_platforms=["linux/amd64"]
+            previous_platforms=["linux/amd64"]
           fi
 
           platforms=$(echo "$current_platforms" | jq -c --argjson prev "$previous_platforms" '
@@ -1054,7 +1051,6 @@ jobs:
 
         stacks=$(echo '${{ needs.preparation.outputs.stacks }}' | jq -c '.[]')
         archs=$(echo '${{ needs.preparation.outputs.architectures }}' | jq -c -r '.[]')
-        repo="${{ needs.preparation.outputs.github_repo_name }}"
         tag="${{ steps.tag.outputs.tag }}"
 
         # Start with an empty array
@@ -1065,17 +1061,22 @@ jobs:
           run_image=$(echo "$stack" | jq -r '.run_image')
           create_build_image=$(echo "$stack" | jq -r '.create_build_image // false')
           run_receipt_filename=$(echo "$stack" | jq -r '.run_receipt_filename')
+          asset_name=$(echo "$stack" | jq -r '.asset_name // ""')
+
+          if [ -z "$asset_name" ]; then
+            asset_name="${{ needs.preparation.outputs.github_repo_name }}"
+          fi
 
           assets="$(jq -c \
             --arg image_filepath "image-files" \
             --arg stack_name "${stack_name}" \
             --arg run_image "${run_image}" \
             --arg tag "${{ steps.tag.outputs.tag }}" \
-            --arg repo "${{ needs.preparation.outputs.github_repo_name }}" \
+            --arg asset_name "$asset_name" \
             '. += [
                 {
                   "path": ($image_filepath + "/" + "current-run-image-" + $stack_name + "/run" + ".oci"),
-                  "name": ($repo + "-" + $tag + "-" + $run_image + ".oci"),
+                  "name": ($asset_name + "-" + $tag + "-" + $run_image + ".oci"),
                   "content_type": "application/gzip"
                 }
               ]' <<<"${assets}")"
@@ -1087,11 +1088,11 @@ jobs:
               --arg stack_name "${stack_name}" \
               --arg build_image "${build_image}" \
               --arg tag "${{ steps.tag.outputs.tag }}" \
-              --arg repo "${{ needs.preparation.outputs.github_repo_name }}" \
+              --arg asset_name "$asset_name" \
               '. += [
                   {
                     "path": ($image_filepath + "/" + "current-build-image-" + $stack_name + "/build" + ".oci"),
-                    "name": ($repo + "-" + $tag + "-" + $build_image + ".oci"),
+                    "name": ($asset_name + "-" + $tag + "-" + $build_image + ".oci"),
                     "content_type": "application/gzip"
                   }
                 ]' <<<"${assets}")"
@@ -1112,13 +1113,13 @@ jobs:
                 --arg stack_name "${stack_name}" \
                 --arg run_image "${run_image}" \
                 --arg tag "${{ steps.tag.outputs.tag }}" \
-                --arg repo "${{ needs.preparation.outputs.github_repo_name }}" \
+                --arg asset_name "$asset_name" \
                 --arg arch "${arch_name}" \
                 --arg arch_prefix "${arch_prefix}" \
                 '. += [
                   {
                     "path": ($hash_code_filepath + "/" + "hash-code-current-run-image-"+ $arch + "-" + $stack_name ),
-                    "name": ($repo + "-" + $tag + $arch_prefix + $run_image + ".oci.sha256"),
+                    "name": ($asset_name + "-" + $tag + $arch_prefix + $run_image + ".oci.sha256"),
                     "content_type": "text/plain"
                   }
                 ]' <<<"${assets}")"
@@ -1131,13 +1132,13 @@ jobs:
                   --arg stack_name "${stack_name}" \
                   --arg build_image "${build_image}" \
                   --arg tag "${{ steps.tag.outputs.tag }}" \
-                  --arg repo "${{ needs.preparation.outputs.github_repo_name }}" \
+                  --arg asset_name "$asset_name" \
                   --arg arch "${arch_name}" \
                   --arg arch_prefix "${arch_prefix}" \
                   '. += [
                     {
                       "path": ($hash_code_filepath + "/" + "hash-code-current-build-image-"+ $arch + "-" + $stack_name ),
-                      "name": ($repo + "-" + $tag + $arch_prefix + $build_image + ".oci.sha256"),
+                      "name": ($asset_name + "-" + $tag + $arch_prefix + $build_image + ".oci.sha256"),
                       "content_type": "text/plain"
                     }
                   ]' <<<"${assets}")"
@@ -1187,7 +1188,7 @@ jobs:
               )
 
               receipt_asset_name=$(
-                echo '[ "'"$repo"'", "'"$tag"'", "'"$arch_name"'", "'"$build_receipt_filename"'"  ]' |
+                echo '[ "'"$asset_name"'", "'"$tag"'", "'"$arch_name"'", "'"$build_receipt_filename"'"  ]' |
                   jq -r 'map(select(. != "amd64")) | map(select(. != "default")) | join("-")'
               )
 
@@ -1195,9 +1196,6 @@ jobs:
                 --arg receipts_filepath "receipt-files" \
                 --arg receipt_file_name "${receipt_file_name}" \
                 --arg receipt_asset_name "${receipt_asset_name}" \
-                --arg tag "${{ steps.tag.outputs.tag }}" \
-                --arg repo "${{ needs.preparation.outputs.github_repo_name }}" \
-                --arg arch_prefix "${arch_prefix}" \
                 '. += [
                   {
                     "path": ($receipts_filepath + "/" + $receipt_file_name),
@@ -1267,13 +1265,13 @@ jobs:
           assets="$(jq -c \
             --arg release_notes_dir "${release_notes_dir}" \
             --arg tag "${{ steps.tag.outputs.tag }}" \
-            --arg repo "${{ needs.preparation.outputs.github_repo_name }}" \
+            --arg asset_name "$asset_name" \
             --arg arch "${arch_name}" \
             --arg arch_prefix "${arch_prefix}" \
             '. += [
               {
                 "path": ($release_notes_dir + "/" + $arch + "-" + "release-notes"),
-                "name": ($repo + "-" + $tag + $arch_prefix + "release-notes.md"),
+                "name": ($asset_name + "-" + $tag + $arch_prefix + "release-notes.md"),
                 "content_type": "text/plain"
               }
             ]' <<<"${assets}")"
