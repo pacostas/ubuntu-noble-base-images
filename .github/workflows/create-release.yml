@@ -29,16 +29,17 @@ jobs:
     name: Preparation
     runs-on: ubuntu-22.04
     outputs:
-      stacks_added: ${{ steps.get-stacks.outputs.stacks_added }}
-      stacks: ${{ steps.get-stacks.outputs.stacks }}
-      support_usns: ${{ steps.polling-os-type.outputs.support_usns }}
       architectures: ${{ steps.lookup.outputs.platforms }}
       archs_added: ${{ steps.lookup.outputs.platforms_added }}
-      polling_type: ${{ steps.polling-os-type.outputs.polling_type }}
       github_repo_name: ${{ steps.repo.outputs.github_repo_name }}
+      os_codename: ${{ steps.lookup.outputs.os_codename }}
+      polling_type: ${{ steps.polling-os-type.outputs.polling_type }}
       registry_repo_name: ${{ steps.repo.outputs.registry_repo_name }}
       repo_owner: ${{ steps.repo.outputs.repo_owner }}
+      stacks: ${{ steps.get-stacks.outputs.stacks }}
+      stacks_added: ${{ steps.get-stacks.outputs.stacks_added }}
       stack_files_dir: ${{ steps.get-stacks.outputs.stack_files_dir }}
+      support_usns: ${{ steps.polling-os-type.outputs.support_usns }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -114,7 +115,8 @@ jobs:
               base_build_container_image,
               base_run_container_image,
               is_new,
-              asset_name
+              asset_name,
+              stack_type
             })')
 
           stacks=$(jq -c <<< "$stacks" )
@@ -800,11 +802,6 @@ jobs:
         repo=$(echo "${full}" | sed 's/^.*\///')
         echo "github_repo_name=${repo}" >> "$GITHUB_OUTPUT"
 
-        # Strip off 'stack' suffix from repo name
-        # some-name-stack --> some-name
-        registry_repo="${repo//-stack/}"
-        echo "registry_repo_name=${registry_repo}" >> "$GITHUB_OUTPUT"
-
     - name: Increment Tag
       if: github.event.inputs.version == ''
       id: semver
@@ -824,13 +821,19 @@ jobs:
     - name: Get registry build and run image names
       id: registry_names
       run: |
+
+        stack_type="${{ matrix.stacks.stack_type }}"
+        if [ -z "${stack_type}" ]; then
+          stack_type="${{ needs.preparation.outputs.registry_repo_name }}"
+        fi
+
         if [ "${{ matrix.stacks.create_build_image }}" == "true" ]; then
-          echo "build_image=${{ needs.preparation.outputs.repo_owner }}/${{ matrix.stacks.build_image }}-${{ needs.preparation.outputs.registry_repo_name }}:${{ steps.tag.outputs.tag }}" >> "$GITHUB_OUTPUT"
+          echo "build_image=${{ needs.preparation.outputs.repo_owner }}/${{ matrix.stacks.build_image }}-${stack_type}:${{ steps.tag.outputs.tag }}" >> "$GITHUB_OUTPUT"
         else
           echo "build_image=" >> "$GITHUB_OUTPUT"
         fi
 
-        echo "run_image=${{ needs.preparation.outputs.repo_owner }}/${{ matrix.stacks.run_image }}-${{ needs.preparation.outputs.registry_repo_name }}:${{ steps.tag.outputs.tag }}" >> "$GITHUB_OUTPUT"
+        echo "run_image=${{ needs.preparation.outputs.repo_owner }}/${{ matrix.stacks.run_image }}-${stack_type}:${{ steps.tag.outputs.tag }}" >> "$GITHUB_OUTPUT"
 
     - name: Create Release Notes per Arch and per Stack
       id: notes_arc_stack
@@ -1279,13 +1282,13 @@ jobs:
           assets="$(jq -c \
             --arg release_notes_dir "${release_notes_dir}" \
             --arg tag "${{ steps.tag.outputs.tag }}" \
-            --arg asset_name "$asset_name" \
+            --arg repo "${{ needs.preparation.outputs.github_repo_name }}" \
             --arg arch "${arch_name}" \
             --arg arch_prefix "${arch_prefix}" \
             '. += [
               {
                 "path": ($release_notes_dir + "/" + $arch + "-" + "release-notes"),
-                "name": ($asset_name + "-" + $tag + $arch_prefix + "release-notes.md"),
+                "name": ($repo + "-" + $tag + $arch_prefix + "release-notes.md"),
                 "content_type": "text/plain"
               }
             ]' <<<"${assets}")"
@@ -1313,11 +1316,16 @@ jobs:
             run_image=$(echo "$stack" | jq -r '.run_image')
             build_image=$(echo "$stack" | jq -r '.build_image')
             create_build_image=$(echo "$stack" | jq -r '.create_build_image // false')
+            stack_type=$(echo "$stack" | jq -r '.stack_type // ""')
+
+            if [ -z "$stack_type" ]; then
+              stack_type="${{ needs.preparation.outputs.registry_repo_name }}"
+            fi
 
             if [ ${create_build_image} == true ]; then
-              echo "Build: \`${{ needs.preparation.outputs.repo_owner }}/${build_image}-${{ needs.preparation.outputs.registry_repo_name }}:${{ steps.tag.outputs.tag }}\`" >> release_notes.md
+              echo "Build: \`${{ needs.preparation.outputs.repo_owner }}/${build_image}-${stack_type}-stack:${{ steps.tag.outputs.tag }}\`" >> release_notes.md
             fi
-            echo "Run: \`${{ needs.preparation.outputs.repo_owner }}/${run_image}-${{ needs.preparation.outputs.registry_repo_name }}:${{ steps.tag.outputs.tag }}\`" >> release_notes.md
+            echo "Run: \`${{ needs.preparation.outputs.repo_owner }}/${run_image}-${stack_type}-stack:${{ steps.tag.outputs.tag }}\`" >> release_notes.md
           done
         fi
 

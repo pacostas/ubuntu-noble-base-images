@@ -13,7 +13,8 @@
       "build_receipt_filename": "build-receipt.cyclonedx.json",
       "run_receipt_filename": "run-receipt.cyclonedx.json",
       "create_build_image": true,
-      "asset_name": "noble-tiny-stack"
+      "asset_name": "noble-tiny-stack",
+      "stack_type": "tiny"
     },
     {
       "name": "noble-base",
@@ -24,7 +25,8 @@
       "build_receipt_filename": "build-receipt.cyclonedx.json",
       "run_receipt_filename": "run-receipt.cyclonedx.json",
       "create_build_image": true,
-      "asset_name": "noble-base-stack"
+      "asset_name": "noble-base-stack",
+      "stack_type": "base"
     },
     {
       "name": "noble-full",
@@ -35,7 +37,8 @@
       "build_receipt_filename": "build-receipt.cyclonedx.json",
       "run_receipt_filename": "run-receipt.cyclonedx.json",
       "create_build_image": true,
-      "asset_name": "noble-full-stack"
+      "asset_name": "noble-full-stack",
+      "stack_type": "full"
     }
   ]
 }
