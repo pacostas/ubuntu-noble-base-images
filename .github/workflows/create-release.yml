@@ -1,5 +1,5 @@
 name: Create Release
-
+## TODO Remove asset name attribute from images.json
 on:
   schedule:
   - cron: '*/30 * * * *'  # every 30 minutes
@@ -32,7 +32,7 @@ jobs:
       architectures: ${{ steps.lookup.outputs.platforms }}
       archs_added: ${{ steps.lookup.outputs.platforms_added }}
       github_repo_name: ${{ steps.repo.outputs.github_repo_name }}
-      os_codename: ${{ steps.lookup.outputs.os_codename }}
+      os_codename: ${{ steps.get-os-codename.outputs.os_codename }}
       polling_type: ${{ steps.polling-os-type.outputs.polling_type }}
       registry_repo_name: ${{ steps.repo.outputs.registry_repo_name }}
       repo_owner: ${{ steps.repo.outputs.repo_owner }}
@@ -138,6 +138,17 @@ jobs:
           fi
 
           echo "support_usns=${support_usns}" >> "$GITHUB_OUTPUT"
+
+      - name: OS codename
+        id: get-os-codeame
+        run: |
+          os_codename=""
+
+          if [[ -f ${{ env.STACKS_FILEPATH }} ]]; then
+            os_codename=$( jq '.os_codename' ${{ env.STACKS_FILEPATH }} )
+          fi
+
+          echo "os_codename=${os_codename}" >> "$GITHUB_OUTPUT"
 
       - name: Get Repository Name
         id: repo
@@ -828,12 +839,12 @@ jobs:
         fi
 
         if [ "${{ matrix.stacks.create_build_image }}" == "true" ]; then
-          echo "build_image=${{ needs.preparation.outputs.repo_owner }}/${{ matrix.stacks.build_image }}-${stack_type}:${{ steps.tag.outputs.tag }}" >> "$GITHUB_OUTPUT"
+          echo "build_image=${{ needs.preparation.outputs.repo_owner }}/${{ matrix.stacks.build_image }}-${os_codename}-${stack_type}:${{ steps.tag.outputs.tag }}" >> "$GITHUB_OUTPUT"
         else
           echo "build_image=" >> "$GITHUB_OUTPUT"
         fi
 
-        echo "run_image=${{ needs.preparation.outputs.repo_owner }}/${{ matrix.stacks.run_image }}-${stack_type}:${{ steps.tag.outputs.tag }}" >> "$GITHUB_OUTPUT"
+        echo "run_image=${{ needs.preparation.outputs.repo_owner }}/${{ matrix.stacks.run_image }}-${os_codename}-${stack_type}:${{ steps.tag.outputs.tag }}" >> "$GITHUB_OUTPUT"
 
     - name: Create Release Notes per Arch and per Stack
       id: notes_arc_stack
@@ -1312,20 +1323,20 @@ jobs:
           echo "" >> release_notes.md
           stacks=$(echo '${{ needs.preparation.outputs.stacks }}' | jq -c -r '.[]')
           for stack in $stacks; do
-            stack_name=$(echo "$stack" | jq -r '.name')
             run_image=$(echo "$stack" | jq -r '.run_image')
             build_image=$(echo "$stack" | jq -r '.build_image')
             create_build_image=$(echo "$stack" | jq -r '.create_build_image // false')
-            stack_type=$(echo "$stack" | jq -r '.stack_type // ""')
+            os_codename="${{ needs.preparation.outputs.architectures }}"
 
+            stack_type=$(echo "$stack" | jq -r '.stack_type // ""')
             if [ -z "$stack_type" ]; then
               stack_type="${{ needs.preparation.outputs.registry_repo_name }}"
             fi
 
             if [ ${create_build_image} == true ]; then
-              echo "Build: \`${{ needs.preparation.outputs.repo_owner }}/${build_image}-${stack_type}-stack:${{ steps.tag.outputs.tag }}\`" >> release_notes.md
+              echo "Build: \`${{ needs.preparation.outputs.repo_owner }}/${build_image}-${os_codename}-${stack_type}:${{ steps.tag.outputs.tag }}\`" >> release_notes.md
             fi
-            echo "Run: \`${{ needs.preparation.outputs.repo_owner }}/${run_image}-${stack_type}-stack:${{ steps.tag.outputs.tag }}\`" >> release_notes.md
+            echo "Run: \`${{ needs.preparation.outputs.repo_owner }}/${run_image}-${os_codename}-${stack_type}:${{ steps.tag.outputs.tag }}\`" >> release_notes.md
           done
         fi
 
