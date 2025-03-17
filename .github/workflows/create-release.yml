@@ -280,13 +280,15 @@ jobs:
         token: ${{ secrets.PAKETO_BOT_GITHUB_TOKEN }}
         strict: true
 
+## TODO set the correct branch and or on below action
     - name: Get Package List
       id: packages
       if: ${{ steps.previous_build.outputs.output_path != '' && steps.previous_run.outputs.output_path != '' }}
-      uses: paketo-buildpacks/github-config/actions/stack/generate-package-list@main
+      uses: pacostas/github-config/actions/stack/generate-package-list@generate-package-list-output-path
       with:
         build_receipt: "${{ github.workspace }}/${{ matrix.arch.name }}-previous-build-receipt-${{ matrix.stacks.name }}"
         run_receipt: "${{ github.workspace }}/${{ matrix.arch.name }}-previous-run-receipt-${{ matrix.stacks.name }}"
+        output_path: "${{ github.workspace }}/${{ matrix.arch.name }}-package-list-${{ matrix.stacks.name }}"
 
     - name: Generate USNs download asset pattern
       id: usn_download_pattern
@@ -329,18 +331,26 @@ jobs:
     - name: Get Stack Distribution Name
       id: distro
       run: |
-        # Extract distro from repo name:
-        # paketo-buildpacks/jammy-tiny-stack --> jammy
-        distro="$(echo "${{ github.repository }}" | sed 's/^.*\///' | sed 's/\-.*$//')"
-        echo "Ubuntu distribution: ${distro}"
-        printf "distro=%s\n" "${distro}" >> "$GITHUB_OUTPUT"
 
+        os_codename="${{ needs.preparation.outputs.os_codename }}"
+
+        if [ -z "$os_codename" ]; then
+          # Extract distro from repo name:
+          # paketo-buildpacks/jammy-tiny-stack --> jammy
+          distro="$(echo "${{ github.repository }}" | sed 's/^.*\///' | sed 's/\-.*$//')"
+          echo "Ubuntu distribution: ${distro}"
+          printf "distro=%s\n" "${distro}" >> "$GITHUB_OUTPUT"
+        else
+          printf "distro=%s\n" "${{ needs.preparation.outputs.os_codename }}" >> "$GITHUB_OUTPUT"
+        fi
+
+    ## TODO change below url to point to paketobiulpacks and to main branch
     - name: Get New USNs
       id: usns
-      uses: paketo-buildpacks/github-config/actions/stack/get-usns@main
+      uses: pacostas/github-config/actions/stack/get-usns@usns-file-store
       with:
         distribution: ${{ steps.distro.outputs.distro }}
-        packages: ${{ steps.packages.outputs.packages }}
+        packages_filepath: "/github/workspace/${{ matrix.arch.name }}-package-list-${{ matrix.stacks.name }}"
         last_usns: ${{ steps.patched.outputs.patched }}
 
     - name: Write USNs File
