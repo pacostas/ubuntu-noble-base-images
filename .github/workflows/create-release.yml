@@ -145,7 +145,7 @@ jobs:
           os_codename=""
 
           if [[ -f ${{ env.STACKS_FILEPATH }} ]]; then
-            os_codename=$( jq '.os_codename' ${{ env.STACKS_FILEPATH }} )
+            os_codename=$( jq -r '.os_codename' ${{ env.STACKS_FILEPATH }} )
           fi
 
           echo "os_codename=${os_codename}" >> "$GITHUB_OUTPUT"
@@ -280,6 +280,7 @@ jobs:
         token: ${{ secrets.PAKETO_BOT_GITHUB_TOKEN }}
         strict: true
 
+## CWIP fails to create the file
 ## TODO set the correct branch and or on below action
     - name: Get Package List
       id: packages
@@ -307,7 +308,7 @@ jobs:
           stack_name_prefix="${{ matrix.stacks.name }}"
         fi
 
-        pattern=$(echo '[${{ needs.preparation.outputs.os_codename }},"${{ matrix.stacks.stack_type }}","stack","\\d+.\\d+(.\\d+)?","'"$stack_name_prefix"'", "'"$arch_prefix"'", "${{ env.PATCHED_USNS_FILENAME }}"]' |  jq -r 'map(select(length > 0)) | join("-")')
+        pattern=$(echo '["${{ needs.preparation.outputs.os_codename }}","${{ matrix.stacks.stack_type }}","stack","\\d+.\\d+(.\\d+)?","'"$stack_name_prefix"'", "'"$arch_prefix"'", "${{ env.PATCHED_USNS_FILENAME }}"]' |  jq -r 'map(select(length > 0)) | join("-")')
 
         echo "pattern=$pattern" >> "$GITHUB_OUTPUT"
 
@@ -341,7 +342,7 @@ jobs:
           echo "Ubuntu distribution: ${distro}"
           printf "distro=%s\n" "${distro}" >> "$GITHUB_OUTPUT"
         else
-          printf "distro=%s\n" "${{ needs.preparation.outputs.os_codename }}" >> "$GITHUB_OUTPUT"
+          printf "distro=%s\n" "${os_codename}" >> "$GITHUB_OUTPUT"
         fi
 
     ## TODO change below url to point to paketobiulpacks and to main branch
@@ -350,7 +351,7 @@ jobs:
       uses: pacostas/github-config/actions/stack/get-usns@usns-file-store
       with:
         distribution: ${{ steps.distro.outputs.distro }}
-        packages_filepath: "/github/workspace/${{ matrix.arch.name }}-package-list-${{ matrix.stacks.name }}"
+        packages_filepath: "${{ github.workspace }}/${{ matrix.arch.name }}-package-list-${{ matrix.stacks.name }}"
         last_usns: ${{ steps.patched.outputs.patched }}
 
     - name: Write USNs File
