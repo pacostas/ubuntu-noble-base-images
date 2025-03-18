@@ -285,12 +285,18 @@ jobs:
     - name: Get Package List
       id: packages
       if: ${{ steps.previous_build.outputs.output_path != '' && steps.previous_run.outputs.output_path != '' }}
-      uses: pacostas/github-config/actions/stack/generate-package-list@generate-package-list-output-path
+      uses: pacostas/github-config/actions/stack/generate-package-list@main
       with:
         build_receipt: "${{ github.workspace }}/${{ matrix.arch.name }}-previous-build-receipt-${{ matrix.stacks.name }}"
         run_receipt: "${{ github.workspace }}/${{ matrix.arch.name }}-previous-run-receipt-${{ matrix.stacks.name }}"
         output_path: "${{ github.workspace }}/${{ matrix.arch.name }}-package-list-${{ matrix.stacks.name }}"
 
+    - name: tree dot
+      run: tree .
+
+    - name: Tree workspace
+      run: tree ${{ github.workspace }}
+      
     - name: Generate USNs download asset pattern
       id: usn_download_pattern
       run: |
@@ -345,10 +351,16 @@ jobs:
           printf "distro=%s\n" "${os_codename}" >> "$GITHUB_OUTPUT"
         fi
 
+    - name: tree dot
+      run: tree .
+
+    - name: Tree workspace
+      run: tree ${{ github.workspace }}
+
     ## TODO change below url to point to paketobiulpacks and to main branch
     - name: Get New USNs
       id: usns
-      uses: pacostas/github-config/actions/stack/get-usns@usns-file-store
+      uses: pacostas/github-config/actions/stack/get-usns@main
       with:
         distribution: ${{ steps.distro.outputs.distro }}
         packages_filepath: "${{ github.workspace }}/${{ matrix.arch.name }}-package-list-${{ matrix.stacks.name }}"
