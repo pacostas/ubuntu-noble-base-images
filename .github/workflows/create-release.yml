@@ -222,9 +222,9 @@ jobs:
         # shellcheck disable=SC2046
         if [ $(gh api "/repos/${{ github.repository }}/releases" | jq -r 'length') -eq 0 ]; then
           echo "exists=false" >> "$GITHUB_OUTPUT"
-          exit 0
+        else
+          echo "exists=true" >> "$GITHUB_OUTPUT"
         fi
-        echo "exists=true" >> "$GITHUB_OUTPUT"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -327,7 +327,7 @@ jobs:
     - name: Write Empty Previous Patched USNs
       if: ${{ matrix.arch.is_new == true || matrix.stacks.is_new == true || steps.check_previous.outputs.exists == 'false' }}
       run: |
-        echo '[]' > "${GITHUB_WORKSPACE}/${{ matrix.arch.name }}-${{ matrix.stacks.name }}-${{ env.PATCHED_USNS_FILENAME }}-previous"
+        echo '[]' > "./${{ matrix.arch.name }}-${{ matrix.stacks.name }}-${{ env.PATCHED_USNS_FILENAME }}-previous"
 
     - name: Find and Download Previous Patched USNs
       if: ${{ steps.check_previous.outputs.exists == 'true' && matrix.arch.is_new == false && matrix.stacks.is_new == false }}
@@ -344,7 +344,7 @@ jobs:
       id: patched
       if: ${{ steps.download_patched.outputs.output_path != '' }}
       run: |
-        patched=$(jq --compact-output . < "${GITHUB_WORKSPACE}/${{ matrix.arch.name }}-${{ matrix.stacks.name }}-${{ env.PATCHED_USNS_FILENAME }}-previous")
+        patched=$(jq --compact-output . < "./${{ matrix.arch.name }}-${{ matrix.stacks.name }}-${{ env.PATCHED_USNS_FILENAME }}-previous")
         printf "patched=%s\n" "${patched}" >> "$GITHUB_OUTPUT"
 
     - name: Get Stack Distribution Name
@@ -695,9 +695,9 @@ jobs:
         # shellcheck disable=SC2046
         if [ $(gh api "/repos/${{ github.repository }}/releases" | jq -r 'length') -eq 0 ]; then
           echo "exists=false" >> "$GITHUB_OUTPUT"
-          exit 0
+        else
+          echo "exists=true" >> "$GITHUB_OUTPUT"
         fi
-        echo "exists=true" >> "$GITHUB_OUTPUT"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
