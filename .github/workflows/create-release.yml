@@ -215,6 +215,19 @@ jobs:
     outputs:
       usns: ${{ steps.new_usns.outputs.usns }}
     steps:
+    - name: Check for Previous Releases
+      id: check_previous
+      run: |
+        gh auth status
+        # shellcheck disable=SC2046
+        if [ $(gh api "/repos/${{ github.repository }}/releases" | jq -r 'length') -eq 0 ]; then
+          echo "exists=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        echo "exists=true" >> "$GITHUB_OUTPUT"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     - name: Generate receipt asset patterns
       id: receipt_pattern
       run: |
@@ -231,7 +244,7 @@ jobs:
         fi
 
     - name: Write Empty Previous Receipts
-      if: ${{ matrix.arch.is_new == true || matrix.stacks.is_new == true }}
+      if: ${{ matrix.arch.is_new == true || matrix.stacks.is_new == true || steps.check_previous.outputs.exists == 'false' }}
       run: |
         if [ ${{ matrix.stacks.create_build_image }} == true ]; then
           if [ ! -f "./${{ matrix.arch.name }}-previous-build-receipt-${{ matrix.stacks.name }}" ]; then
@@ -241,19 +254,6 @@ jobs:
         if [ ! -f "./${{ matrix.arch.name }}-previous-run-receipt-${{ matrix.stacks.name }}" ]; then
           echo '{"components":[]}' > "./${{ matrix.arch.name }}-previous-run-receipt-${{ matrix.stacks.name }}"
         fi
-
-    - name: Check for Previous Releases
-      id: check_previous
-      run: |
-        gh auth status
-        # shellcheck disable=SC2046
-        if [ $(gh api "/repos/${{ github.repository }}/releases" | jq -r 'length') -eq 0 ]; then
-          echo "exists=false" >> "$GITHUB_OUTPUT"
-          exit 0
-        fi
-        echo "exists=true" >> "$GITHUB_OUTPUT"
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Find and Download Previous Build Receipt
       if: ${{ matrix.arch.is_new == false && matrix.stacks.is_new == false && steps.check_previous.outputs.exists == 'true' }}
@@ -279,16 +279,15 @@ jobs:
         token: ${{ secrets.PAKETO_BOT_GITHUB_TOKEN }}
         strict: true
 
-## CWIP fails to create the file
 ## TODO set the correct branch and or on below action
     - name: Get Package List
       id: packages
       if: ${{ steps.previous_build.outputs.output_path != '' && steps.previous_run.outputs.output_path != '' }}
-      uses: pacostas/github-config/actions/stack/generate-package-list@main
+      uses: paketo-buildpacks/github-config/actions/stack/generate-package-list@main
       with:
         build_receipt: "${{ github.workspace }}/${{ matrix.arch.name }}-previous-build-receipt-${{ matrix.stacks.name }}"
         run_receipt: "${{ github.workspace }}/${{ matrix.arch.name }}-previous-run-receipt-${{ matrix.stacks.name }}"
-        output_path: "${{ github.workspace }}/${{ matrix.arch.name }}-package-list-${{ matrix.stacks.name }}"
+        # output_path: "${{ github.workspace }}/${{ matrix.arch.name }}-package-list-${{ matrix.stacks.name }}"
 
     - name: tree dot
       run: tree .
@@ -299,6 +298,15 @@ jobs:
     - name: Generate USNs download asset pattern
       id: usn_download_pattern
       run: |
+        os_codename="${{ needs.preparation.outputs.os_codename }}"
+        stack_type=${{ matrix.stacks.stack_type }}
+
+        if [ -z "$stack_type" ]; then
+          asset_prefix="${{ needs.preparation.outputs.github_repo_name }}"
+        else
+          asset_prefix="${{ needs.preparation.outputs.os_codename }}-${{ matrix.stacks.stack_type }}-stack"
+        fi
+
         arch_prefix=""
         if [ "${{ matrix.arch.name }}" = "amd64" ]; then
           arch_prefix=""
@@ -306,18 +314,23 @@ jobs:
           arch_prefix="${{ matrix.arch.name }}"
         fi
 
-        stack_name_prefix=""
-        if [ "${{ matrix.stacks.name }}" = "default" ]; then
-          stack_name_prefix=""
-        else
-          stack_name_prefix="${{ matrix.stacks.name }}"
-        fi
-
-        pattern=$(echo '["${{ needs.preparation.outputs.os_codename }}","${{ matrix.stacks.stack_type }}","stack","\\d+.\\d+(.\\d+)?","'"$stack_name_prefix"'", "'"$arch_prefix"'", "${{ env.PATCHED_USNS_FILENAME }}"]' |  jq -r 'map(select(length > 0)) | join("-")')
-
+        pattern=$(
+          echo '[
+            "'"$asset_prefix"'",
+            "\\d+.\\d+(.\\d+)?",
+            "'"$arch_prefix"'",
+            "${{ env.PATCHED_USNS_FILENAME }}"
+          ]' | jq -r 'map(select(length > 0)) | join("-")'
+        )
         echo "pattern=$pattern" >> "$GITHUB_OUTPUT"
 
+    - name: Write Empty Previous Patched USNs
+      if: ${{ matrix.arch.is_new == true || matrix.stacks.is_new == true || steps.check_previous.outputs.exists == 'false' }}
+      run: |
+        echo '[]' > "${GITHUB_WORKSPACE}/${{ matrix.arch.name }}-${{ matrix.stacks.name }}-${{ env.PATCHED_USNS_FILENAME }}-previous"
+
     - name: Find and Download Previous Patched USNs
+      if: ${{ steps.check_previous.outputs.exists == 'true' && matrix.arch.is_new == false && matrix.stacks.is_new == false }}
       id: download_patched
       uses: paketo-buildpacks/github-config/actions/release/find-and-download-asset@main
       with:
