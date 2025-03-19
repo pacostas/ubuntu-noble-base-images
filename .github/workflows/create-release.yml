@@ -280,6 +280,14 @@ jobs:
         token: ${{ secrets.PAKETO_BOT_GITHUB_TOKEN }}
         strict: true
 
+## TODO remove below step
+    - name: tree dot
+      run: tree .
+
+## TODO remove below step
+    - name: Tree workspace
+      run: tree ${{ github.workspace }}
+
 ## TODO set the correct branch and or on below action
     - name: Get Package List
       id: packages
