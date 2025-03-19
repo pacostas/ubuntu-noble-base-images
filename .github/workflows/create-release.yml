@@ -243,6 +243,7 @@ jobs:
           echo "run=${{ needs.preparation.outputs.os_codename }}-${{ matrix.stacks.stack_type }}-stack-\\d+\\.\\d+(\\.\\d+)?-${{ matrix.arch.name }}-${{ matrix.stacks.run_receipt_filename }}" >> "$GITHUB_OUTPUT"
         fi
 
+# TODO below step can be removed
     - name: Write Empty Previous Receipts
       if: ${{ matrix.arch.is_new == true || matrix.stacks.is_new == true || steps.check_previous.outputs.exists == 'false' }}
       run: |
@@ -279,6 +280,14 @@ jobs:
         token: ${{ secrets.PAKETO_BOT_GITHUB_TOKEN }}
         strict: true
 
+## TODO remove below step
+    - name: tree dot
+      run: tree .
+
+## TODO remove below step
+    - name: Tree workspace
+      run: tree ${{ github.workspace }}
+
 ## TODO set the correct branch and or on below action
     - name: Get Package List
       id: packages
@@ -289,9 +298,11 @@ jobs:
         run_receipt: "${{ github.workspace }}/${{ matrix.arch.name }}-previous-run-receipt-${{ matrix.stacks.name }}"
         # output_path: "${{ github.workspace }}/${{ matrix.arch.name }}-package-list-${{ matrix.stacks.name }}"
 
+## TODO remove below step
     - name: tree dot
       run: tree .
 
+## TODO remove below step
     - name: Tree workspace
       run: tree ${{ github.workspace }}
       
@@ -363,9 +374,11 @@ jobs:
           printf "distro=%s\n" "${os_codename}" >> "$GITHUB_OUTPUT"
         fi
 
+## TODO remove below step
     - name: tree dot
       run: tree .
 
+## TODO remove below step
     - name: Tree workspace
       run: tree ${{ github.workspace }}
 
@@ -375,7 +388,7 @@ jobs:
       uses: pacostas/github-config/actions/stack/get-usns@main
       with:
         distribution: ${{ steps.distro.outputs.distro }}
-        packages_filepath: "${{ github.workspace }}/${{ matrix.arch.name }}-package-list-${{ matrix.stacks.name }}"
+        packages: ${{ steps.packages.outputs.packages }}
         last_usns: ${{ steps.patched.outputs.patched }}
 
     - name: Write USNs File
