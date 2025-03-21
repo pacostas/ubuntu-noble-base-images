@@ -144,20 +144,22 @@ jobs:
         mkdir -p ./.bin/
         chmod 777 ./.bin/
 
+        image_name=${{ matrix.oci_image.name }}-${{ needs.preparation.outputs.registry_repo_name }}
+
         ./scripts/publish.sh \
-          --image-ref "docker.io/${DOCKERHUB_ORG}/${{ matrix.oci_image.name }}-${{ needs.preparation.outputs.registry_repo_name }}:${{ needs.preparation.outputs.tag }}" \
-          --image-ref "docker.io/${DOCKERHUB_ORG}/${{ matrix.oci_image.name }}-${{ needs.preparation.outputs.registry_repo_name }}:latest" \
+          --image-ref "docker.io/${DOCKERHUB_ORG}/image_name:${{ needs.preparation.outputs.tag }}" \
+          --image-ref "docker.io/${DOCKERHUB_ORG}/image_name:latest" \
           --image-archive "./${{ matrix.oci_image.name }}.oci"
 
         if [ "${{ needs.preparation.outputs.push_to_gcr }}" = "true" ]; then
 
-          platforms=$(docker manifest inspect "docker.io/${DOCKERHUB_ORG}/${{ matrix.oci_image.name }}-${{ needs.preparation.outputs.registry_repo_name }}:${{ needs.preparation.outputs.tag }}" |
+          platforms=$(docker manifest inspect "docker.io/${DOCKERHUB_ORG}/image_name:${{ needs.preparation.outputs.tag }}" |
             jq -r '[.manifests[].platform] | [.[] | .os + "/" + .architecture] | join(",")')
 
-          echo "FROM docker.io/${DOCKERHUB_ORG}/${{ matrix.oci_image.name }}-${{ needs.preparation.outputs.registry_repo_name }}:${{ needs.preparation.outputs.tag }}" | \
+          echo "FROM docker.io/${DOCKERHUB_ORG}/image_name:${{ needs.preparation.outputs.tag }}" | \
           docker buildx build -f - . \
-            --tag "${{ env.GCR_REGISTRY }}/${GCR_PROJECT}/${{ matrix.oci_image.name }}-${{ needs.preparation.outputs.registry_repo_name }}:${{ needs.preparation.outputs.tag }}" \
-            --tag "${{ env.GCR_REGISTRY }}/${GCR_PROJECT}/${{ matrix.oci_image.name }}-${{ needs.preparation.outputs.registry_repo_name }}:latest" \
+            --tag "${{ env.GCR_REGISTRY }}/${GCR_PROJECT}/image_name:${{ needs.preparation.outputs.tag }}" \
+            --tag "${{ env.GCR_REGISTRY }}/${GCR_PROJECT}/image_name:latest" \
               --platform "$platforms" \
             --provenance=false \
             --push
