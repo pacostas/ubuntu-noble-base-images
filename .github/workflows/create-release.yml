@@ -1,5 +1,5 @@
 name: Create Release
-## TODO Remove asset name attribute from images.json
+
 on:
   schedule:
   - cron: '*/30 * * * *'  # every 30 minutes
@@ -50,59 +50,53 @@ jobs:
         id: get-stacks
         run: |
 
-          if [[ -f ${{ env.STACKS_FILEPATH }} ]]; then
-            current_stacks=$(jq '[.images[] |
-            . +
-            {
-              "create_build_image": (.create_build_image // false),
-              "is_new": true
-            }]' ${{ env.STACKS_FILEPATH }} )
-
+          if [ -f ${{ env.STACKS_FILEPATH }} ]; then
+            current_stacks=$(jq -c '[.images[] ]' ${{ env.STACKS_FILEPATH }} | jq -c '.[]')
             stack_files_dir="$(dirname "${{ env.STACKS_FILEPATH }}")"
-
-            git show $(git describe --tags --abbrev=0):"${{ env.STACKS_FILEPATH }}" > ./previous_images.json
-
-            if [[ -f "./previous_images.json" && "$(git tag | wc -l)" -ne 0 ]]; then
-              previous_stacks=$(jq '[.images[] |
-              . +
-              {
-                "create_build_image": (.create_build_image // false),
-                "is_new": false
-              }]' "./previous_images.json")
-            else
-              previous_stacks="[]"
-            fi
-
-            stacks=$(echo "$current_stacks" | jq -c --argjson prev "$previous_stacks" '
-                map(
-                    . as $curr |
-                    ($prev[] | select(.name == $curr.name)) // $curr
-                )
-            ')
           else
-            stacks=$(
-            cat <<EOF
-          [
-            {
-              "name": "default",
-              "config_dir": "stack",
-              "output_dir": "build",
-              "build_image": "build",
-              "build_receipt_filename": "build-receipt.cyclonedx.json",
-              "run_image": "run",
-              "run_receipt_filename": "run-receipt.cyclonedx.json",
-              "create_build_image": true,
-              "is_new": false
-            }
-          ]
-          EOF
-          )
+            current_stacks=$(jq -n -c '[
+                {
+                  "name": "default",
+                  "config_dir": "stack",
+                  "output_dir": "build",
+                  "build_image": "build",
+                  "build_receipt_filename": "build-receipt.cyclonedx.json",
+                  "run_image": "run",
+                  "run_receipt_filename": "run-receipt.cyclonedx.json",
+                  "create_build_image": true,
+                  "is_new": false
+                }
+              ]' | jq -c '.[]')
             stack_files_dir="stack"
           fi
 
-          echo "stack_files_dir=$stack_files_dir" >> "$GITHUB_OUTPUT"
+          git show $(git describe --tags --abbrev=0):"$stack_files_dir/images.json" >./previous_images.json
 
-          ## Filter stacks array to include the minimum number of attributes
+          if [[ -f "./previous_images.json" && "$(git tag | wc -l)" -ne 0 ]]; then
+            previous_stacks=$(jq '[.images[] ]' previous_images.json)
+          else
+            previous_stacks=$(jq -n -c '[]')
+          fi
+
+          # Start with an empty array
+          stacks=$(jq -n -c '[]')
+
+          for c_stack in $current_stacks; do
+
+            c_stack_name=$(echo "$c_stack" | jq -r '.name')
+            stack_exists=$(jq --arg c_stack_name "$c_stack_name" '.[] | select(.name == $c_stack_name)' <<<"$previous_stacks")
+
+            if [[ -n $stack_exists ]]; then
+              c_stack=$(jq --argjson c_stack "$c_stack" '. + {is_new: false}' <<< "$c_stack")
+            else
+              c_stack=$(jq --argjson c_stack "$c_stack" '. + {is_new: true}' <<< "$c_stack")
+            fi
+            stacks=$(jq --argjson c_stack "$c_stack" '. + [$c_stack]' <<< "$stacks")
+
+          done
+
+
+          # Filter stacks array to include the minimum number of attributes
           stacks=$(echo "$stacks" | jq 'map({
               name,
               config_dir,
@@ -119,8 +113,8 @@ jobs:
             })')
 
           stacks=$(jq -c <<< "$stacks" )
-          printf "stacks=%s\n" "${stacks}" >> "$GITHUB_OUTPUT"
-
+          echo "stacks=$stacks" >> "$GITHUB_OUTPUT"
+          echo "stack_files_dir=$stack_files_dir" >> "$GITHUB_OUTPUT"
       - name: Polling OS type
         id: polling-os-type
         run: |
