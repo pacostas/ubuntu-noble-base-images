@@ -283,6 +283,11 @@ jobs:
     - name: Tree workspace
       run: tree ${{ github.workspace }}
 
+    - name: Write Empty Package list
+      if: ${{ steps.previous_build.outputs.output_path == '' && steps.previous_run.outputs.output_path == '' }}
+      run: |
+        echo '[]' > "./${{ matrix.arch.name }}-package-list-${{ matrix.stacks.name }}"
+
 ## TODO set the correct branch and or on below action
     - name: Get Package List
       id: packages
