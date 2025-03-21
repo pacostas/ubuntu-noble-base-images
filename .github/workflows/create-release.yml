@@ -92,9 +92,7 @@ jobs:
               c_stack=$(jq --argjson c_stack "$c_stack" '. + {is_new: true}' <<< "$c_stack")
             fi
             stacks=$(jq --argjson c_stack "$c_stack" '. + [$c_stack]' <<< "$stacks")
-
           done
-
 
           # Filter stacks array to include the minimum number of attributes
           stacks=$(echo "$stacks" | jq 'map({
@@ -238,7 +236,6 @@ jobs:
           echo "run=${{ needs.preparation.outputs.os_codename }}-${{ matrix.stacks.stack_type }}-stack-\\d+\\.\\d+(\\.\\d+)?-${{ matrix.arch.name }}-${{ matrix.stacks.run_receipt_filename }}" >> "$GITHUB_OUTPUT"
         fi
 
-# TODO below step can be removed
     - name: Write Empty Previous Receipts
       if: ${{ matrix.arch.is_new == true || matrix.stacks.is_new == true || steps.check_previous.outputs.exists == 'false' }}
       run: |
@@ -275,14 +272,6 @@ jobs:
         token: ${{ secrets.PAKETO_BOT_GITHUB_TOKEN }}
         strict: true
 
-## TODO remove below step
-    - name: tree dot
-      run: tree .
-
-## TODO remove below step
-    - name: Tree workspace
-      run: tree ${{ github.workspace }}
-
     - name: Write Empty Package list
       if: ${{ steps.previous_build.outputs.output_path == '' && steps.previous_run.outputs.output_path == '' }}
       run: |
@@ -298,14 +287,6 @@ jobs:
         run_receipt: "${{ github.workspace }}/${{ matrix.arch.name }}-previous-run-receipt-${{ matrix.stacks.name }}"
         output_path: "${{ github.workspace }}/${{ matrix.arch.name }}-package-list-${{ matrix.stacks.name }}"
 
-## TODO remove below step
-    - name: tree dot
-      run: tree .
-
-## TODO remove below step
-    - name: Tree workspace
-      run: tree ${{ github.workspace }}
-      
     - name: Generate USNs download asset pattern
       id: usn_download_pattern
       run: |
@@ -358,14 +339,6 @@ jobs:
         patched=$(jq --compact-output . < "./${{ matrix.arch.name }}-${{ matrix.stacks.name }}-${{ env.PATCHED_USNS_FILENAME }}-previous")
         printf "patched=%s\n" "${patched}" >> "$GITHUB_OUTPUT"
 
-## TODO remove below step
-    - name: tree dot
-      run: tree .
-
-## TODO remove below step
-    - name: Tree workspace
-      run: tree ${{ github.workspace }}
-
     ## TODO change below url to point to paketobiulpacks and to main branch
     - name: Get New USNs
       id: usns
@@ -393,9 +366,9 @@ jobs:
     - name: Are any new USNs
       id: new_usns
       run: |
-        new_usns_length=$(cat "${{ matrix.arch.name }}-${{ matrix.stacks.name }}-${{ env.PATCHED_USNS_FILENAME }}" | jq 'length')
+        are_new_usns=$(cat "${{ matrix.arch.name }}-${{ matrix.stacks.name }}-${{ env.PATCHED_USNS_FILENAME }}" | jq 'length > 0')
 
-        if [ "$new_usns_length" -ge 0 ]; then
+        if [ $are_new_usns == true ]; then
           echo "usns=true" >> "$GITHUB_OUTPUT"
         fi
 
@@ -540,7 +513,7 @@ jobs:
         run: |
           if [ '${{ needs.poll_images.result }}' != 'skipped' ]; then
             echo "Poll images job did not skip"
-            if [ '${{ needs.poll_images.outputs.images_need_update }}' = "true" ]; then
+            if [ '${{ needs.poll_images.outputs.images_need_update }}' = 'true' ]; then
               echo "SHAs have changed"
               echo "changed=true" >> "$GITHUB_OUTPUT"
             else
@@ -552,7 +525,7 @@ jobs:
 
           if [ '${{ needs.poll_usns.result }}' != 'skipped' ]; then
             echo "Poll USNs did not skip"
-            if [ '${{ needs.poll_usns.outputs.usns }}' = "true" ]; then
+            if [ '${{ needs.poll_usns.outputs.usns }}' = 'true' ]; then
               echo "USNs have changed"
               echo "changed=true" >> "$GITHUB_OUTPUT"
             else
@@ -586,7 +559,6 @@ jobs:
     #   run: |
     #     scripts/create.sh --stack-dir ${{ matrix.stacks.config_dir }} \
     #                       --build-dir ${{ matrix.stacks.output_dir }}
-    # repo=$(echo "${full}" | sed 's/^.*\///')
 
     ## TODO remove debug code
     - name: Create stack ${{ matrix.stacks.name }}
