@@ -162,25 +162,6 @@ jobs:
             --provenance=false \
             --push
         fi
-        # If the repository name contains 'bionic', let's push it to legacy image locations as well:
-        #    paketobuildpacks/{build/run}:{version}-{variant}
-        #    paketobuildpacks/{build/run}:{version}-{variant}-cnb
-        #    paketobuildpacks/{build/run}:{variant}-cnb
-        #    paketobuildpacks/{build/run}:{variant}
-        registry_repo="${{ needs.preparation.outputs.registry_repo_name }}"
-        if [[ ${registry_repo} == "bionic"-* ]];
-          then
-          # Strip the final part from a repo name after the `-`
-          # bionic-tiny --> tiny
-          variant="${registry_repo#bionic-}"
-
-          sudo skopeo copy "oci-archive:./${{ matrix.oci_image.name }}.oci" "docker://${DOCKERHUB_ORG}/${{ matrix.oci_image.name }}:${{ steps.event.outputs.tag }}-${variant}"
-          sudo skopeo copy "oci-archive:./${{ matrix.oci_image.name }}.oci" "docker://${DOCKERHUB_ORG}/${{ matrix.oci_image.name }}:${{ steps.event.outputs.tag }}-${variant}-cnb"
-          sudo skopeo copy "oci-archive:./${{ matrix.oci_image.name }}.oci" "docker://${DOCKERHUB_ORG}/${{ matrix.oci_image.name }}:${variant}-cnb"
-          sudo skopeo copy "oci-archive:./${{ matrix.oci_image.name }}.oci" "docker://${DOCKERHUB_ORG}/${{ matrix.oci_image.name }}:${variant}"
-
-          sudo skopeo copy "docker://${DOCKERHUB_ORG}/${{ matrix.oci_image.name }}:${variant}-cnb" "docker://gcr.io/${GCR_PROJECT}/${{ matrix.oci_image.name }}:${variant}-cnb"
-        fi
 
   failure:
     name: Alert on Failure
