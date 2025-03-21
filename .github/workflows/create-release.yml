@@ -32,7 +32,7 @@ jobs:
       architectures: ${{ steps.lookup.outputs.platforms }}
       archs_added: ${{ steps.lookup.outputs.platforms_added }}
       github_repo_name: ${{ steps.repo.outputs.github_repo_name }}
-      os_codename: ${{ steps.get-os-codename.outputs.os_codename }}
+      os_codename: ${{ steps.repo.outputs.os_codename }}
       polling_type: ${{ steps.polling-os-type.outputs.polling_type }}
       registry_repo_name: ${{ steps.repo.outputs.registry_repo_name }}
       repo_owner: ${{ steps.repo.outputs.repo_owner }}
@@ -132,17 +132,6 @@ jobs:
 
           echo "support_usns=${support_usns}" >> "$GITHUB_OUTPUT"
 
-      - name: OS codename
-        id: get-os-codename
-        run: |
-          os_codename=""
-
-          if [[ -f ${{ env.STACKS_FILEPATH }} ]]; then
-            os_codename=$( jq -r '.os_codename' ${{ env.STACKS_FILEPATH }} )
-          fi
-
-          echo "os_codename=${os_codename}" >> "$GITHUB_OUTPUT"
-
       - name: Get Repository Name
         id: repo
         run: |
@@ -160,6 +149,18 @@ jobs:
           # translates 'paketo-buildpacks' to 'paketobuildpacks'
           repo_owner="${GITHUB_REPOSITORY_OWNER/-/}"
           printf "repo_owner=%s\n" "${repo_owner}" >> "$GITHUB_OUTPUT"
+
+          os_codename=""
+
+          if [[ -f ${{ env.STACKS_FILEPATH }} ]]; then
+            os_codename=$( jq -r '.os_codename' ${{ env.STACKS_FILEPATH }} )
+          else
+            # Extract codename from repo name:
+            # paketo-buildpacks/jammy-tiny-stack --> jammy
+            codename="$(echo "${{ github.repository }}" | sed 's/^.*\///' | sed 's/\-.*$//')"
+          fi
+
+          echo "os_codename=${os_codename}" >> "$GITHUB_OUTPUT"
 
       - name: Lookup Supported Architectures
         id: lookup
@@ -352,22 +353,6 @@ jobs:
         patched=$(jq --compact-output . < "./${{ matrix.arch.name }}-${{ matrix.stacks.name }}-${{ env.PATCHED_USNS_FILENAME }}-previous")
         printf "patched=%s\n" "${patched}" >> "$GITHUB_OUTPUT"
 
-    - name: Get Stack Distribution Name
-      id: distro
-      run: |
-
-        os_codename="${{ needs.preparation.outputs.os_codename }}"
-
-        if [ -z "$os_codename" ]; then
-          # Extract distro from repo name:
-          # paketo-buildpacks/jammy-tiny-stack --> jammy
-          distro="$(echo "${{ github.repository }}" | sed 's/^.*\///' | sed 's/\-.*$//')"
-          echo "Ubuntu distribution: ${distro}"
-          printf "distro=%s\n" "${distro}" >> "$GITHUB_OUTPUT"
-        else
-          printf "distro=%s\n" "${os_codename}" >> "$GITHUB_OUTPUT"
-        fi
-
 ## TODO remove below step
     - name: tree dot
       run: tree .
@@ -381,7 +366,7 @@ jobs:
       id: usns
       uses: pacostas/github-config/actions/stack/get-usns@main
       with:
-        distribution: ${{ steps.distro.outputs.distro }}
+        distribution: ${{ needs.preparation.outputs.os_codename }}
         packages_filepath: "./${{ matrix.arch.name }}-package-list-${{ matrix.stacks.name }}"
         last_usns: ${{ steps.patched.outputs.patched }}
 
@@ -875,18 +860,24 @@ jobs:
       id: registry_names
       run: |
 
+        os_codename="${{ needs.preparation.outputs.os_codename }}"
         stack_type="${{ matrix.stacks.stack_type }}"
-        if [ -z "${stack_type}" ]; then
-          stack_type="${{ needs.preparation.outputs.registry_repo_name }}"
-        fi
 
-        if [ "${{ matrix.stacks.create_build_image }}" == "true" ]; then
-          echo "build_image=${{ needs.preparation.outputs.repo_owner }}/${{ matrix.stacks.build_image }}-${os_codename}-${stack_type}:${{ steps.tag.outputs.tag }}" >> "$GITHUB_OUTPUT"
+        if [ -z "$stack_type" ]; then
+          if [ "${{ matrix.stacks.create_build_image }}" == "true" ]; then
+            echo "build_image=${{ needs.preparation.outputs.repo_owner }}/${{ matrix.stacks.build_image }}-${{ needs.preparation.outputs.registry_repo_name }}:${{ steps.tag.outputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "build_image=" >> "$GITHUB_OUTPUT"
+          fi
+            echo "run_image=${{ needs.preparation.outputs.repo_owner }}/${{ matrix.stacks.run_image }}-${{ needs.preparation.outputs.registry_repo_name }}:${{ steps.tag.outputs.tag }}" >> "$GITHUB_OUTPUT"
         else
-          echo "build_image=" >> "$GITHUB_OUTPUT"
+          if [ "${{ matrix.stacks.create_build_image }}" == "true" ]; then
+            echo "build_image=${{ needs.preparation.outputs.repo_owner }}/${{ matrix.stacks.build_image }}-${os_codename}-${stack_type}:${{ steps.tag.outputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "build_image=" >> "$GITHUB_OUTPUT"
+          fi
+          echo "run_image=${{ needs.preparation.outputs.repo_owner }}/${{ matrix.stacks.run_image }}-${os_codename}-${stack_type}:${{ steps.tag.outputs.tag }}" >> "$GITHUB_OUTPUT"
         fi
-
-        echo "run_image=${{ needs.preparation.outputs.repo_owner }}/${{ matrix.stacks.run_image }}-${os_codename}-${stack_type}:${{ steps.tag.outputs.tag }}" >> "$GITHUB_OUTPUT"
 
     - name: Create Release Notes per Arch and per Stack
       id: notes_arc_stack
