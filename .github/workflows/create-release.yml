@@ -1121,13 +1121,14 @@ jobs:
         # Start with an empty array
         assets=$(jq -n -c '[]')
 
+        # Adding the .oci artifacts
         for stack in $stacks; do
           stack_name=$(echo "$stack" | jq -r '.name')
           create_build_image=$(echo "$stack" | jq -r '.create_build_image // false')
           stack_type=$(echo "$stack" | jq -r '.stack_type // ""')
           pattern_assets_prefix=$(echo "$stack" | jq -r '.pattern_assets_prefix // ""')
 
-          # Adding the .oci artifacts for the build image to the assets
+          # .oci artifacts for the run image
           run_image=$(echo "$stack" | jq -r '.run_image')
           if [[ "$pattern_assets_prefix" == "os_name-os_codename-build_image_run_image-stack_type-version-arch" ]]; then
             asset_prefix="${os_name}-${os_codename}-${run_image}-${stack_type}-${version}"
@@ -1149,9 +1150,8 @@ jobs:
                 }
               ]' <<<"${assets}")"
 
-          # Adding the .oci artifacts for the build image to the assets
+          # .oci artifacts for the build image
           if [[ $create_build_image == true ]]; then
-
             build_image=$(echo "$stack" | jq -r '.build_image')
             if [[ "$pattern_assets_prefix" == "os_name-os_codename-build_image_run_image-stack_type-version-arch" ]]; then
               asset_prefix="${os_name}-${os_codename}-${build_image}-${stack_type}-${version}"
@@ -1173,9 +1173,16 @@ jobs:
                   }
                 ]' <<<"${assets}")"
           fi
+        done
 
-          # Adding the hash code files to the assets
-          if [ "${{ needs.preparation.outputs.polling_type }}" = "hash" ]; then
+        # Adding hash code files to the assets
+        if [[ "${{ needs.preparation.outputs.polling_type }}" == "hash" ]]; then
+          for stack in $stacks; do
+            stack_name=$(echo "$stack" | jq -r '.name')
+            create_build_image=$(echo "$stack" | jq -r '.create_build_image // false')
+            stack_type=$(echo "$stack" | jq -r '.stack_type // ""')
+            pattern_assets_prefix=$(echo "$stack" | jq -r '.pattern_assets_prefix // ""')
+
             for arch in $archs; do
               arch_name=$(echo "$arch" | jq -r '.name')
               arch_prefix="-${arch_name}-"
@@ -1189,7 +1196,6 @@ jobs:
                 asset_prefix="${os_codename}-${stack_type}-${repo_type}-${version}"
               fi
 
-              ## Add the Hash code files of the run images to the assets
               run_image=$(echo "$stack" | jq -r '.run_image')
               assets="$(jq -c \
                 --arg hash_code_filepath "hash-code-files" \
@@ -1206,7 +1212,7 @@ jobs:
                   }
                 ]' <<<"${assets}")"
 
-              ## Add the Hash code files of the build images to the assets
+              # hash code for the build image
               if [[ $create_build_image == true ]]; then
 
                 build_image=$(echo "$stack" | jq -r '.build_image')
@@ -1231,14 +1237,21 @@ jobs:
                   ]' <<<"${assets}")"
               fi
             done
-          fi
+          done
+        fi
 
-          # Adding the SBOM files to the artifacts
+        # SBOM/receipt.cyclonedx.json receipt assets
+        for stack in $stacks; do
+          stack_name=$(echo "$stack" | jq -r '.name')
+          create_build_image=$(echo "$stack" | jq -r '.create_build_image // false')
+          stack_type=$(echo "$stack" | jq -r '.stack_type // ""')
+          pattern_assets_prefix=$(echo "$stack" | jq -r '.pattern_assets_prefix // ""')
+
           for arch in $archs; do
             arch_name=$(echo "$arch" | jq -r '.name')
-            arch_prefix="-${arch_name}-"
+            arch_prefix=$arch_name
             if [[ $arch_name == "amd64" ]]; then
-              arch_prefix="-"
+              arch_prefix=""
             fi
 
             # SBOM for the run image
@@ -1251,24 +1264,30 @@ jobs:
               asset_prefix="${os_codename}-${stack_type}-${repo_type}-${version}-${run_image}"
             fi
 
+            sbom_asset_name=$(
+              echo '[
+                  "'"$asset_prefix"'",
+                  "'"$arch_prefix"'",
+                  "receipt.cyclonedx.json"
+                ]' | jq -r 'map(select(length > 0)) | join("-")'
+            )
+
             assets="$(jq -c \
-              --arg sbom_filepath "receipt-files" \
-              --arg stack_name "${stack_name}" \
-              --arg asset_prefix "$asset_prefix" \
-              --arg arch "${arch_name}" \
-              --arg arch_prefix "${arch_prefix}" \
-              '. += [
+            --arg sbom_filepath "receipt-files" \
+            --arg stack_name "${stack_name}" \
+            --arg arch "${arch_name}" \
+            --arg sbom_asset_name "${sbom_asset_name}" \
+            '. += [
                 {
                   "path": ($sbom_filepath + "/" + $arch + "-" + "current-run-receipt"+ "-" + $stack_name ),
-                  "name": ($asset_prefix + $arch_prefix + "-" + "receipt.cyclonedx.json"),
+                  "name": $sbom_asset_name,
                   "content_type": "text/plain"
                 }
               ]' <<<"${assets}")"
 
-            ## Add the Hash code files of the build images to the assets
+            # SBOM for the build image
             if [[ $create_build_image == true ]]; then
 
-              # SBOM for the run image
               build_image=$(echo "$stack" | jq -r '.build_image')
               if [[ "$pattern_assets_prefix" == "os_name-os_codename-build_image_run_image-stack_type-version-arch" ]]; then
                 asset_prefix="${os_name}-${os_codename}-${build_image}-${stack_type}-${version}"
@@ -1278,16 +1297,23 @@ jobs:
                 asset_prefix="${os_codename}-${stack_type}-${repo_type}-${version}-${build_image}"
               fi
 
+              sbom_asset_name=$(
+                echo '[
+                    "'"$asset_prefix"'",
+                    "'"$arch_prefix"'",
+                    "receipt.cyclonedx.json"
+                  ]' | jq -r 'map(select(length > 0)) | join("-")'
+              )
+
               assets="$(jq -c \
-                --arg sbom_filepath "receipt-files" \
-                --arg stack_name "${stack_name}" \
-                --arg asset_prefix "$asset_prefix" \
-                --arg arch "${arch_name}" \
-                --arg arch_prefix "${arch_prefix}" \
-                '. += [
+              --arg sbom_filepath "receipt-files" \
+              --arg stack_name "${stack_name}" \
+              --arg arch "${arch_name}" \
+              --arg sbom_asset_name "${sbom_asset_name}" \
+              '. += [
                   {
                     "path": ($sbom_filepath + "/" + $arch + "-" + "current-build-receipt"+ "-" + $stack_name ),
-                    "name": ($asset_prefix + $arch_prefix + "-" + "receipt.cyclonedx.json"),
+                    "name": $sbom_asset_name,
                     "content_type": "text/plain"
                   }
                 ]' <<<"${assets}")"
