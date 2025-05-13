@@ -756,7 +756,7 @@ jobs:
       uses: paketo-buildpacks/github-config/actions/stack/diff-package-receipts@main
       with:
         previous: "/github/workspace/${{ matrix.arch.name }}-previous-build-receipt-${{ matrix.stacks.name }}"
-        current: "/github/workspace/${{ matrix.arch.name }}-current-build-receipt-${{ matrix.stacks.name }}"
+        current: "receipt-files/current-build-receipt-${{ matrix.stacks.name }}/${{ matrix.arch.name }}-current-build-receipt-${{ matrix.stacks.name }}"
         added_diff_file: "/github/workspace/${{ env.BUILD_DIFF_ADDED_FILENAME }}"
         modified_diff_file: "/github/workspace/${{ env.BUILD_DIFF_MODIFIED_FILENAME }}"
         removed_diff_file: "/github/workspace/${{ env.BUILD_DIFF_REMOVED_FILENAME }}"
@@ -766,7 +766,7 @@ jobs:
       uses: paketo-buildpacks/github-config/actions/stack/diff-package-receipts@main
       with:
         previous: "/github/workspace/${{ matrix.arch.name }}-previous-run-receipt-${{ matrix.stacks.name }}"
-        current: "/github/workspace/${{ matrix.arch.name }}-current-run-receipt-${{ matrix.stacks.name }}"
+        current: "receipt-files/current-run-receipt-${{ matrix.stacks.name }}/${{ matrix.arch.name }}-current-run-receipt-${{ matrix.stacks.name }}"
         added_diff_file: "/github/workspace/${{ env.RUN_DIFF_ADDED_FILENAME }}"
         modified_diff_file: "/github/workspace/${{ env.RUN_DIFF_MODIFIED_FILENAME }}"
         removed_diff_file: "/github/workspace/${{ env.RUN_DIFF_REMOVED_FILENAME }}"
