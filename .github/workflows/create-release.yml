@@ -328,7 +328,7 @@ jobs:
         build_image="${{ matrix.stacks.build_image }}"
         run_image="${{ matrix.stacks.run_image }}"
         pattern_assets_prefix="${{ matrix.stacks.pattern_assets_prefix }}"
-        arch_name: "${{ matrix.arch.name }}"
+        arch_name="${{ matrix.arch.name }}"
 
         asset_prefix=""
         if [[ "$pattern_assets_prefix" == "os_name-os_codename-build_image_run_image-stack_type-version-arch" ]]; then
