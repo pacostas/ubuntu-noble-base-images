@@ -328,18 +328,20 @@ jobs:
         build_image="${{ matrix.stacks.build_image }}"
         run_image="${{ matrix.stacks.run_image }}"
         pattern_assets_prefix="${{ matrix.stacks.pattern_assets_prefix }}"
+        arch_name: "${{ matrix.arch.name }}"
 
+        asset_prefix=""
         if [[ "$pattern_assets_prefix" == "os_name-os_codename-build_image_run_image-stack_type-version-arch" ]]; then
           asset_prefix="${os_name}-${os_codename}-${stack_type}"
-        elif [[ $pattern_assets_prefix" == "os_name-os_codename-build_image_run_image-version-arch" ]]; then
+        elif [[ "$pattern_assets_prefix" == "os_name-os_codename-build_image_run_image-version-arch" ]]; then
           asset_prefix="${os_name}-${os_codename}"
         fi
 
         arch_prefix=""
-        if [ "${{ matrix.arch.name }}" = "amd64" ]; then
+        if [[ "${arch_name}" = "amd64" ]]; then
           arch_prefix=""
         else
-          arch_prefix="${{ matrix.arch.name }}"
+          arch_prefix="${arch_name}"
         fi
 
         pattern=$(
