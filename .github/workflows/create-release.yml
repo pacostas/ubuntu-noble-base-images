@@ -270,8 +270,8 @@ jobs:
           fi
         fi
 
-        echo "build=${build} >> "$GITHUB_OUTPUT"
-        echo "run=${run} >> "$GITHUB_OUTPUT"
+        echo "build=${build}" >> "$GITHUB_OUTPUT"
+        echo "run=${run}" >> "$GITHUB_OUTPUT"
 
     - name: Write Empty Previous Build Receipt
       if: ${{ matrix.stacks.create_build_image == false || matrix.arch.is_new == true || matrix.stacks.is_new == true || steps.check_previous.outputs.exists == 'false' }}
@@ -433,8 +433,8 @@ jobs:
           fi
         fi
 
-        echo "build=${build} >> "$GITHUB_OUTPUT"
-        echo "run=${run} >> "$GITHUB_OUTPUT"
+        echo "build=${build}" >> "$GITHUB_OUTPUT"
+        echo "run=${run}" >> "$GITHUB_OUTPUT"
 
     - name: Find and Download Previous build image hash code of stack ${{ matrix.stacks.build_image }}
       if: ${{ matrix.stacks.create_build_image == true }}
@@ -726,8 +726,8 @@ jobs:
           fi
         fi
 
-        echo "build_filename=${build} >> "$GITHUB_OUTPUT"
-        echo "run_filename=${run} >> "$GITHUB_OUTPUT"
+        echo "build_filename=${build}" >> "$GITHUB_OUTPUT"
+        echo "run_filename=${run}" >> "$GITHUB_OUTPUT"
 
     - name: Find and Download Previous Build Receipt
       if: ${{ matrix.stacks.create_build_image == true &&  steps.check_previous.outputs.exists == 'true' && matrix.arch.is_new == false && matrix.stacks.is_new == false }}
