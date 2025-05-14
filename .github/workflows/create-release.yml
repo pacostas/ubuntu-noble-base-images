@@ -1113,7 +1113,6 @@ jobs:
 
         stacks=$(echo '${{ needs.preparation.outputs.stacks }}' | jq -c '.[]')
         archs=$(echo '${{ needs.preparation.outputs.architectures }}' | jq -c -r '.[]')
-        tag="${{ steps.tag.outputs.tag }}"
         version="${{ steps.tag.outputs.tag }}"
         os_codename="${{ needs.preparation.outputs.os_codename }}"
         os_name="${{needs.preparation.outputs.os_name}}"
@@ -1232,7 +1231,7 @@ jobs:
                   '. += [
                     {
                       "path": ($hash_code_filepath + "/" + "hash-code-current-build-image-"+ $arch + "-" + $stack_name ),
-                      "name": ($asset_prefix + "-" + $tag + $arch_prefix + $build_image + ".oci.sha256"),
+                      "name": ($asset_prefix + "-" + $arch_prefix + $build_image + ".oci.sha256"),
                       "content_type": "text/plain"
                     }
                   ]' <<<"${assets}")"
@@ -1287,8 +1286,9 @@ jobs:
               ]' <<<"${assets}")"
 
             # SBOM for the build image
-            if [[ $create_build_image == true ]]; then
+            if [[ "$create_build_image" == "true" ]]; then
 
+              asset_prefix=""
               build_image=$(echo "$stack" | jq -r '.build_image')
               if [[ "$pattern_assets_prefix" == "os_name-os_codename-build_image_run_image-stack_type-version-arch" ]]; then
                 asset_prefix="${os_name}-${os_codename}-${build_image}-${stack_type}-${version}"
@@ -1332,6 +1332,7 @@ jobs:
             pattern_assets_prefix=$(echo "$stack" | jq -r '.pattern_assets_prefix // ""')
             version="${{ steps.tag.outputs.tag }}"
 
+            asset_prefix=""
             if [[ "$pattern_assets_prefix" == "os_name-os_codename-build_image_run_image-stack_type-version-arch" ]]; then
               asset_prefix="${os_name}-${os_codename}-${stack_type}-${version}"
             elif [[ "$pattern_assets_prefix" == "os_name-os_codename-build_image_run_image-version-arch" ]]; then
@@ -1389,7 +1390,7 @@ jobs:
           # add release notes of the arch on the assets
           assets="$(jq -c \
             --arg release_notes_dir "${release_notes_dir}" \
-            --arg tag "${{ steps.tag.outputs.tag }}" \
+            --arg tag "${version}" \
             --arg repo "${{ needs.preparation.outputs.github_repo_name }}" \
             --arg arch "${arch_name}" \
             --arg arch_prefix "${arch_prefix}" \
@@ -1440,7 +1441,7 @@ jobs:
               run_image_registry_name="${{ needs.preparation.outputs.repo_owner }}/${run_image}-${os_codename}-${stack_type}:${{ steps.tag.outputs.tag }}"
             fi
 
-            if [ $create_build_image == true ]; then
+            if [[ "$create_build_image" == "true" ]]; then
               echo "Build: \`${build_image_registry_name}\`" >> release_notes.md
             fi
             echo "Run: \`${run_image_registry_name}\`" >> release_notes.md

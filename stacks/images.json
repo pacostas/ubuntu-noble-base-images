@@ -1,6 +1,5 @@
 {
   "support_usns": true,
-  "update_on_new_image": true,
   "receipts_show_limit": 16,
   "platforms": ["linux/amd64", "linux/arm64"],
   "os_name": "ubuntu",
