@@ -1141,7 +1141,7 @@ jobs:
           assets="$(jq -c \
             --arg image_filepath "image-files" \
             --arg stack_name "${stack_name}" \
-            --arg asset_prefix "$asset_prefix" \
+            --arg asset_prefix "${asset_prefix}" \
             '. += [
                 {
                   "path": ($image_filepath + "/" + "current-run-image-" + $stack_name + "/run" + ".oci"),
